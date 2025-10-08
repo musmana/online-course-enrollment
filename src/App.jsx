@@ -13,16 +13,45 @@ const App = () => {
   const [emailExists, setEmailExists] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
+  const courseOptions = [
+    { value: '', label: 'Select Course' },
+    { value: 'react', label: 'React Mastery', duration: '8 weeks', fees: '$299' },
+    { value: 'javascript', label: 'JavaScript Fundamentals', duration: '6 weeks', fees: '$199' },
+    { value: 'python', label: 'Python for Beginners', duration: '10 weeks', fees: '$249' },
+    { value: 'webdev', label: 'Full Stack Web Development', duration: '12 weeks', fees: '$399' },
+    { value: 'datascience', label: 'Data Science Essentials', duration: '14 weeks', fees: '$349' }
+  ];
+
+  const countryOptions = [
+    { value: '', label: 'Select Country' },
+    { value: 'us', label: 'United States' },
+    { value: 'uk', label: 'United Kingdom' },
+    { value: 'ca', label: 'Canada' },
+    { value: 'au', label: 'Australia' },
+    { value: 'in', label: 'India' },
+    { value: 'de', label: 'Germany' },
+    { value: 'fr', label: 'France' }
+  ];
 
   // Simulate async email validation
   useEffect(() => {
-    if (formData.email) {
+    if (formData.email && formData.email.includes('@')) {
+      setCheckingEmail(true);
       const checkEmail = setTimeout(() => {
         // Simulate API call - in real app, this would be an actual API endpoint
-        const existingEmails = ['test@example.com', 'user@domain.com'];
+        const existingEmails = ['test@example.com', 'user@domain.com', 'existing@email.com'];
         setEmailExists(existingEmails.includes(formData.email));
-      }, 1000);
-      return () => clearTimeout(checkEmail);
+        setCheckingEmail(false);
+      }, 1500);
+      return () => {
+        clearTimeout(checkEmail);
+        setCheckingEmail(false);
+      };
+    } else {
+      setEmailExists(false);
+      setCheckingEmail(false);
     }
   }, [formData.email]);
 
@@ -35,11 +64,25 @@ const App = () => {
   };
 
   const handleCourseChange = (index, field, value) => {
+    const updatedCourses = formData.courses.map((course, i) =>
+      i === index ? { ...course, [field]: value } : course
+    );
+
+    // Auto-populate duration and fees when course is selected
+    if (field === 'name' && value) {
+      const selectedCourse = courseOptions.find(opt => opt.value === value);
+      if (selectedCourse) {
+        updatedCourses[index] = {
+          ...updatedCourses[index],
+          duration: selectedCourse.duration,
+          fees: selectedCourse.fees
+        };
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
-      courses: prev.courses.map((course, i) =>
-        i === index ? { ...course, [field]: value } : course
-      )
+      courses: updatedCourses
     }));
   };
 
@@ -63,13 +106,19 @@ const App = () => {
   };
 
   const validateStep1 = () => {
-    return formData.name && formData.email && formData.country && formData.gender && !emailExists;
+    return (
+      formData.name.trim() !== '' &&
+      formData.email.trim() !== '' &&
+      formData.country !== '' &&
+      formData.gender !== '' &&
+      !emailExists &&
+      !checkingEmail
+    );
   };
 
   const validateStep2 = () => {
-    return formData.courses.every(course => 
-      course.name && course.duration && course.fees
-    );
+    // Check if all courses have a name selected (not empty)
+    return formData.courses.every(course => course.name !== '');
   };
 
   const nextStep = () => {
@@ -81,7 +130,9 @@ const App = () => {
   };
 
   const prevStep = () => {
-    setStep(prev => prev - 1);
+    if (step > 1) {
+      setStep(prev => prev - 1);
+    }
   };
 
   const handleSubmit = () => {
@@ -103,27 +154,19 @@ const App = () => {
     });
     setStep(1);
     setSubmitted(false);
+    setEmailExists(false);
   };
 
-  const courseOptions = [
-    { value: '', label: 'Select Course' },
-    { value: 'react', label: 'React Mastery', duration: '8 weeks', fees: '$299' },
-    { value: 'javascript', label: 'JavaScript Fundamentals', duration: '6 weeks', fees: '$199' },
-    { value: 'python', label: 'Python for Beginners', duration: '10 weeks', fees: '$249' },
-    { value: 'webdev', label: 'Full Stack Web Development', duration: '12 weeks', fees: '$399' },
-    { value: 'datascience', label: 'Data Science Essentials', duration: '14 weeks', fees: '$349' }
-  ];
-
-  const countryOptions = [
-    { value: '', label: 'Select Country' },
-    { value: 'us', label: 'United States' },
-    { value: 'uk', label: 'United Kingdom' },
-    { value: 'ca', label: 'Canada' },
-    { value: 'au', label: 'Australia' },
-    { value: 'in', label: 'India' },
-    { value: 'de', label: 'Germany' },
-    { value: 'fr', label: 'France' }
-  ];
+  // Calculate total fees
+  const calculateTotalFees = () => {
+    return formData.courses.reduce((total, course) => {
+      if (course.fees) {
+        const feeValue = parseInt(course.fees.replace('$', '')) || 0;
+        return total + feeValue;
+      }
+      return total;
+    }, 0);
+  };
 
   return (
     <div className="app">
@@ -151,6 +194,7 @@ const App = () => {
             {step === 1 && (
               <div className="form-step">
                 <h2>Student Details</h2>
+                
                 <div className="form-group">
                   <label htmlFor="name">Full Name *</label>
                   <input
@@ -160,7 +204,11 @@ const App = () => {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="Enter your full name"
+                    required
                   />
+                  {formData.name === '' && (
+                    <span className="error-message">Name is required</span>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -173,9 +221,16 @@ const App = () => {
                     onChange={handleInputChange}
                     placeholder="Enter your email"
                     className={emailExists ? 'error' : ''}
+                    required
                   />
+                  {checkingEmail && (
+                    <span className="checking-message">Checking email availability...</span>
+                  )}
                   {emailExists && (
                     <span className="error-message">This email is already registered</span>
+                  )}
+                  {formData.email && !formData.email.includes('@') && (
+                    <span className="error-message">Please enter a valid email address</span>
                   )}
                 </div>
 
@@ -186,6 +241,7 @@ const App = () => {
                     name="country"
                     value={formData.country}
                     onChange={handleInputChange}
+                    required
                   >
                     {countryOptions.map(option => (
                       <option key={option.value} value={option.value}>
@@ -193,6 +249,9 @@ const App = () => {
                       </option>
                     ))}
                   </select>
+                  {formData.country === '' && (
+                    <span className="error-message">Please select a country</span>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -229,10 +288,21 @@ const App = () => {
                       Other
                     </label>
                   </div>
+                  {formData.gender === '' && (
+                    <span className="error-message">Please select a gender</span>
+                  )}
+                </div>
+
+                <div className="step-validation">
+                  {validateStep1() ? (
+                    <span className="validation-success">✓ All fields are valid</span>
+                  ) : (
+                    <span className="validation-error">Please fill all required fields correctly</span>
+                  )}
                 </div>
 
                 <button 
-                  className="btn-primary" 
+                  className={`btn-primary ${!validateStep1() ? 'disabled' : ''}`}
                   onClick={nextStep}
                   disabled={!validateStep1()}
                 >
@@ -244,6 +314,8 @@ const App = () => {
             {step === 2 && (
               <div className="form-step">
                 <h2>Course Selection</h2>
+                <p className="step-description">Select the courses you want to enroll in. You can add multiple courses.</p>
+                
                 {formData.courses.map((course, index) => (
                   <div key={course.id} className="course-section">
                     <div className="course-header">
@@ -264,6 +336,7 @@ const App = () => {
                       <select
                         value={course.name}
                         onChange={(e) => handleCourseChange(index, 'name', e.target.value)}
+                        required
                       >
                         {courseOptions.map(option => (
                           <option key={option.value} value={option.value}>
@@ -271,6 +344,9 @@ const App = () => {
                           </option>
                         ))}
                       </select>
+                      {course.name === '' && (
+                        <span className="error-message">Please select a course</span>
+                      )}
                     </div>
 
                     {course.name && (
@@ -279,16 +355,18 @@ const App = () => {
                           <label>Duration</label>
                           <input
                             type="text"
-                            value={courseOptions.find(opt => opt.value === course.name)?.duration || ''}
+                            value={course.duration}
                             readOnly
+                            className="read-only"
                           />
                         </div>
                         <div className="form-group">
                           <label>Fees</label>
                           <input
                             type="text"
-                            value={courseOptions.find(opt => opt.value === course.name)?.fees || ''}
+                            value={course.fees}
                             readOnly
+                            className="read-only"
                           />
                         </div>
                       </>
@@ -304,12 +382,22 @@ const App = () => {
                   + Add Another Course
                 </button>
 
+                <div className="step-validation">
+                  {validateStep2() ? (
+                    <span className="validation-success">
+                      ✓ {formData.courses.length} course(s) selected - Total: ${calculateTotalFees()}
+                    </span>
+                  ) : (
+                    <span className="validation-error">Please select at least one course</span>
+                  )}
+                </div>
+
                 <div className="button-group">
                   <button className="btn-outline" onClick={prevStep}>
                     Back
                   </button>
                   <button 
-                    className="btn-primary" 
+                    className={`btn-primary ${!validateStep2() ? 'disabled' : ''}`}
                     onClick={nextStep}
                     disabled={!validateStep2()}
                   >
@@ -322,6 +410,8 @@ const App = () => {
             {step === 3 && (
               <div className="form-step">
                 <h2>Review Your Information</h2>
+                <p className="step-description">Please review your information before submitting.</p>
+                
                 <div className="review-section">
                   <h3>Student Details</h3>
                   <div className="review-item">
@@ -340,28 +430,31 @@ const App = () => {
 
                 <div className="review-section">
                   <h3>Selected Courses</h3>
-                  {formData.courses.map((course, index) => (
-                    <div key={index} className="course-review">
-                      <h4>Course {index + 1}</h4>
-                      <div className="review-item">
-                        <strong>Course:</strong> {courseOptions.find(c => c.value === course.name)?.label}
+                  {formData.courses.map((course, index) => {
+                    const courseInfo = courseOptions.find(c => c.value === course.name);
+                    return (
+                      <div key={index} className="course-review">
+                        <h4>Course {index + 1}: {courseInfo?.label}</h4>
+                        <div className="review-item">
+                          <strong>Duration:</strong> {course.duration}
+                        </div>
+                        <div className="review-item">
+                          <strong>Fees:</strong> {course.fees}
+                        </div>
                       </div>
-                      <div className="review-item">
-                        <strong>Duration:</strong> {courseOptions.find(c => c.value === course.name)?.duration}
-                      </div>
-                      <div className="review-item">
-                        <strong>Fees:</strong> {courseOptions.find(c => c.value === course.name)?.fees}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  <div className="total-fees">
+                    <strong>Total Amount: ${calculateTotalFees()}</strong>
+                  </div>
                 </div>
 
                 <div className="button-group">
                   <button className="btn-outline" onClick={prevStep}>
-                    Back
+                    Back to Courses
                   </button>
                   <button 
-                    className="btn-primary" 
+                    className="btn-primary"
                     onClick={handleSubmit}
                     disabled={isSubmitting}
                   >
@@ -375,7 +468,8 @@ const App = () => {
           <div className="success-message">
             <div className="success-icon">✓</div>
             <h2>Enrollment Successful!</h2>
-            <p>Thank you for enrolling in our courses. You will receive a confirmation email shortly.</p>
+            <p>Thank you <strong>{formData.name}</strong> for enrolling in our courses. A confirmation email has been sent to <strong>{formData.email}</strong>.</p>
+            <p>You have enrolled in {formData.courses.length} course(s) with total fees of <strong>${calculateTotalFees()}</strong>.</p>
             <button className="btn-primary" onClick={resetForm}>
               Enroll Another Student
             </button>
